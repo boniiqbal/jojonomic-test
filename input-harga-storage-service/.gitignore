@@ -1,0 +1,11 @@
+vendor
+.vscode
+config/.env
+config/.env.stg
+config/.env.dev
+config/.env.prd
+hydra
+.idea
+*_credential.json
+.DS_Store
+coverage.txt

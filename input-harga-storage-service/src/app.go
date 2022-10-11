@@ -7,8 +7,10 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	kafka "github.com/segmentio/kafka-go"
+	"github.com/teris-io/shortid"
 
 	"github.com/input-harga-storage-service/config"
 	"github.com/input-harga-storage-service/src/model"
@@ -38,15 +40,23 @@ func (s *Server) Run() {
 		}
 		log.Printf("message at topic/partition/offset %v/%v/%v: %s\n", m.Topic, m.Partition, m.Offset, string(m.Key))
 		var harga model.Harga
-		if err := json.Unmarshal(m.Value, &harga); err != nil {
+		var request model.RequestInputHarga
+		if err := json.Unmarshal(m.Value, &request); err != nil {
 			fmt.Printf("unmarshall data error : %s", err.Error())
 		}
+
+		reffID, _ := shortid.Generate()
+		harga.ID = reffID
+		harga.TopupPrice = int64(request.HargaTopup)
+		harga.BuybackPrice = int64(request.HargaBuyback)
+		harga.UserID = request.AdminID
+		harga.CreatedAt = time.Now()
 		_, err = s.config.DB().Master().InsertInto(`harga`).Columns(
 			`topup_price`,
 			`buyback_price`,
+			`id`,
 			`user_id`,
-			`created_at,`,
-			`updated_at`,
+			`created_at`,
 		).Record(harga).ExecContext(ctx)
 
 		if err != nil {
@@ -65,7 +75,7 @@ func getKafkaReader(kafkaURL, topic, groupID string) *kafka.Reader {
 		Brokers:  brokers,
 		GroupID:  groupID,
 		Topic:    topic,
-		MinBytes: 1e3,  // 1KB
+		MinBytes: 0,    // 1KB
 		MaxBytes: 10e6, // 10MB
 	})
 }

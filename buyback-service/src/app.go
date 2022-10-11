@@ -22,15 +22,14 @@ import (
 type Server struct {
 	httpServer *mux.Router
 	config     *config.Config
-	kafka      *kafka.Writer
+	kafka      *kafka.Conn
 }
 
 // InitServer ...
 func InitServer(cfg *config.Config) *Server {
 	r := mux.NewRouter()
 
-	kafkaWriter := getKafkaWriter(cfg.KafkaUrl(), cfg.KafkaTopic())
-	defer kafkaWriter.Close()
+	kafkaWriter := createKafkaConn(cfg.KafkaUrl(), cfg.KafkaTopic())
 
 	return &Server{httpServer: r, config: cfg, kafka: kafkaWriter}
 }
@@ -79,11 +78,13 @@ func (s *Server) createBuyback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.kafka.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	msg := kafka.Message{
 		Key:   []byte(fmt.Sprintf("address-%s", r.RemoteAddr)),
 		Value: payloadBytes,
 	}
-	err = s.kafka.WriteMessages(r.Context(), msg)
+	
+	_, err = s.kafka.WriteMessages(msg)
 	if err != nil {
 		log.Println(err.Error())
 		shared.RespondWithError(w, http.StatusBadRequest, true, reffID, "Kafka not ready")
@@ -93,10 +94,11 @@ func (s *Server) createBuyback(w http.ResponseWriter, r *http.Request) {
 	shared.RespondSuccess(w, http.StatusOK, false, reffID, nil)
 }
 
-func getKafkaWriter(kafkaURL, topic string) *kafka.Writer {
-	return &kafka.Writer{
-		Addr:     kafka.TCP(kafkaURL),
-		Topic:    topic,
-		Balancer: &kafka.LeastBytes{},
+func createKafkaConn(kafkaURL, topic string) *kafka.Conn {
+	conn, err := kafka.DialLeader(context.Background(), "tcp", kafkaURL, topic, 0)
+	if err != nil {
+		log.Fatal(err.Error())
 	}
+
+	return conn
 }

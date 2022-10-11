@@ -1,4 +1,4 @@
-package dto
+package model
 
 type RequestInputHarga struct {
 	AdminID      string `json:"admin_id"`

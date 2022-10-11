@@ -10,6 +10,7 @@ import (
 	"time"
 
 	kafka "github.com/segmentio/kafka-go"
+	"github.com/teris-io/shortid"
 
 	"github.com/topup-storage-service/config"
 	"github.com/topup-storage-service/src/dto"
@@ -71,14 +72,16 @@ func (s *Server) Run() {
 				fmt.Printf("Failed error : %s", err.Error())
 			}
 
+			reffID, _ := shortid.Generate()
 			_, err = s.config.DB().Master().InsertInto(`transaksi`).Columns(
+				`id`,
 				`rekening_id`,
 				`gram`,
 				`type`,
 				`topup_price`,
 				`buyback_price`,
 				`created_at`,
-			).Values(resp.ID, params.Gram, "buyback", harga.TopupPrice, harga.BuybackPrice, time.Now().Unix()).ExecContext(ctx)
+			).Values(reffID, resp.ID, params.Gram, "buyback", harga.TopupPrice, harga.BuybackPrice, time.Now().Unix()).ExecContext(ctx)
 
 			if err != nil {
 				fmt.Printf("Failed error : %s", err.Error())
